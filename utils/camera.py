@@ -28,6 +28,9 @@ def interpolate_poses(key_poses: torch.Tensor, target_frames: int) -> torch.Tens
     # Create time array
     times = np.linspace(0, 1, len(key_poses))
     target_times = np.linspace(0, 1, target_frames)
+
+    # Check if translations are in the expected shape
+    assert translations.ndim == 2 and translations.shape[1] == 3, f"Unexpected shape: {translations.shape}"
     
     # Interpolate translations
     interp_translations = np.stack([
@@ -152,3 +155,39 @@ def three_key_poses_trajectory(
     # Stack the key poses and interpolate
     key_poses = torch.stack(key_poses)
     return interpolate_poses(key_poses, target_frames)
+
+def modify_instance_trajectories(instance_poses: torch.Tensor, edit_type: str = "s_curve") -> torch.Tensor:
+    """
+    Modify instance (vehicle) trajectories using interpolation.
+
+    Args:
+        instance_poses (torch.Tensor): Original trajectories of shape (num_frames, num_instances, 4, 4).
+        edit_type (str): Type of modification ("s_curve", "linear", "random").
+
+    Returns:
+        torch.Tensor: Edited trajectories (num_frames, num_instances, 4, 4).
+    """
+    print(f"instance_poses type: {type(instance_poses)}")
+    print(f"instance_poses sample: {instance_poses[:2]}")
+
+    num_frames, num_instances = instance_poses.shape[:2]
+
+    new_trajectories = instance_poses.clone()
+
+    for instance_idx in range(instance_poses.shape[1]):  # Iterate over instances
+        if edit_type == "s_curve":
+            key_poses = instance_poses[::num_frames//4, instance_idx, :, :]
+            new_trajectories[:, instance_idx, :, :] = interpolate_poses(key_poses, num_frames)
+        
+        elif edit_type == "linear":
+            key_poses = instance_poses[[0, -1], instance_idx, :]  # Only start & end key frames
+            new_trajectories[:, instance_idx, :, :] = interpolate_poses(key_poses, num_frames)
+
+        elif edit_type == "random":
+            noise = torch.randn_like(instance_poses[:, instance_idx, :3, 3]) * 0.5  # Small random displacement
+            new_trajectories[:, instance_idx, :3, 3] += noise
+
+        else:
+            raise ValueError(f"Unknown edit type: {edit_type}")
+
+    return new_trajectories

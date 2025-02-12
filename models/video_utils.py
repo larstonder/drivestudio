@@ -123,6 +123,11 @@ def render(
         human_psnrs, human_ssims = [], []
         vehicle_psnrs, vehicle_ssims = [], []
         occupied_psnrs, occupied_ssims = [], []
+    
+    print("checking if trainer has edit_nodes")
+    if hasattr(trainer, 'edit_nodes'):
+        print("Calling editing nodes")
+        trainer.edit_nodes()
 
     with torch.no_grad():
         indices = vis_indices if vis_indices is not None else range(len(dataset))

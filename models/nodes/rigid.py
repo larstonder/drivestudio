@@ -557,6 +557,39 @@ class RigidNodes(VanillaGaussians):
             # keeps original point ids
             self.point_ids = torch.cat([self.point_ids, torch.full_like(new_gaussian["point_ids"], ins_id)], dim=0)
     
+    def translate_instance(self, ins_id: int, delta_xyz: torch.Tensor) -> None:
+        """
+        translate instance with id ins_id
+        
+        Args:
+            ins_id: instance id
+            delta_xyz: translation vector
+        """
+        pts_mask = self.point_ids[..., 0] == ins_id
+        self._means[pts_mask] = self._means[pts_mask] + delta_xyz
+    
+    def rotate_instance(self, ins_id: int, delta_quat: torch.Tensor) -> None:
+        """
+        rotate instance with id ins_id
+        
+        Args:
+            ins_id: instance id
+            delta_quat: rotation quaternion
+        """
+        pts_mask = self.point_ids[..., 0] == ins_id
+        self._quats[pts_mask] = quat_mult(self._quats[pts_mask], delta_quat)
+    
+    def scale_instance(self, ins_id: int, delta_scale: torch.Tensor) -> None:
+        """
+        scale instance with id ins_id
+        
+        Args:
+            ins_id: instance id
+            delta_scale: scaling vector
+        """
+        pts_mask = self.point_ids[..., 0] == ins_id
+        self._scales[pts_mask] = self._scales[pts_mask] + delta_scale
+    
     def export_gaussians_to_ply(self, alpha_thresh: float, instance_id: List[int] = None) -> Dict[str, torch.Tensor]:
         pts_mask = self.point_ids[..., 0] == instance_id
         

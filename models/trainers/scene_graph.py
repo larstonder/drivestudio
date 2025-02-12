@@ -232,6 +232,18 @@ class MultiTrainer(BasicTrainer):
             image_ids=image_infos["img_idx"].flatten()[0],
             novel_view=novel_view
         )
+
+        # edit every second rigid node with node.translate_instances
+        # for class_name in self.gaussian_classes.keys():
+        #     model = self.models[class_name]
+        #     if hasattr(model, 'translate_instances'):
+        #         instances_size = model.instances_size # (num_instances, 3)
+        #         for i in range(0, instances_size.shape[0], 2):
+        #             model.translate_instances(
+        #                 ins_id=i,
+        #                 delta_xyz=0.1 * torch.randn(3).to(self.device)
+        #             )
+
         gs = self.collect_gaussians(
             cam=processed_cam,
             image_ids=image_infos["img_idx"].flatten()[0]
@@ -294,3 +306,15 @@ class MultiTrainer(BasicTrainer):
         metric_dict = super().compute_metrics(outputs, image_infos)
         
         return metric_dict
+    
+    def edit_nodes(self):
+        print("Editing nodes")
+        for class_name in self.gaussian_classes.keys():
+            model = self.models[class_name]
+            if hasattr(model, 'translate_instance'):
+                instances_size = model.instances_size # (num_instances, 3)
+                for i in range(0, instances_size.shape[0], 2):
+                    model.translate_instance(
+                        ins_id=i,
+                        delta_xyz=5 * torch.randn(3).to(self.device)
+                    )
