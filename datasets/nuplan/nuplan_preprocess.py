@@ -98,7 +98,7 @@ class NuPlanProcessor(object):
         
         process_log_list = []
         for idx in process_id_list:
-            process_log_list.append(self.nuplandb_wrapper.log_names[idx])
+            process_log_list.append(idx)
         self.process_log_list = process_log_list
         
         self.save_dir = os.path.join(save_dir, prefix)

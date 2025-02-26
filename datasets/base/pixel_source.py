@@ -723,7 +723,7 @@ class ScenePixelSource(abc.ABC):
         logger.info("[Pixel] All Pixel Data loaded.")
         
         if self.data_cfg.load_objects:
-            self.load_objects()
+            self.load_objects() #maybe we can collect instance ids here
             logger.info("[Pixel] All Object Annotations loaded.")
         
         # set initial downscale factor

@@ -310,11 +310,23 @@ class MultiTrainer(BasicTrainer):
     def edit_nodes(self):
         print("Editing nodes")
         for class_name in self.gaussian_classes.keys():
+            print(f"\nEditing {class_name}")
             model = self.models[class_name]
+            # print all attributes
+
+            for key in model.__dict__.keys():
+                print(f"{key}: {model.__dict__[key]}")
+
             if hasattr(model, 'translate_instance'):
                 instances_size = model.instances_size # (num_instances, 3)
                 for i in range(0, instances_size.shape[0], 2):
+
+                    if hasattr(model, 'point_ids'):
+                        print(f"Point ids: {model.point_ids[i].item()}")
+                    
+                    forward_tensor = torch.tensor([5, 0.0, 0.0]).to(self.device)
                     model.translate_instance(
                         ins_id=i,
-                        delta_xyz=5 * torch.randn(3).to(self.device)
+                        delta_xyz=forward_tensor
                     )
+        print("Editing nodes done")

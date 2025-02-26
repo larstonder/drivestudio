@@ -16,6 +16,10 @@ class RigidNodes(VanillaGaussians):
         self,
         **kwargs
     ):
+        # print all the parameters
+        print("RigidNodes parameters:")
+        for k, v in kwargs.items():
+            print(f"{k}: {v}")
         super().__init__(**kwargs)
         
     @property
@@ -103,7 +107,7 @@ class RigidNodes(VanillaGaussians):
         param_groups[self.class_prefix+"ins_rotation"] = [self.instances_quats]
         param_groups[self.class_prefix+"ins_translation"] = [self.instances_trans]
         return param_groups
-    
+
     def get_instances_quats(self, instances_pose: torch.Tensor) -> torch.Tensor:
         """
         Convert the pose to quaternion for all frames and instances
