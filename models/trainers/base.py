@@ -650,6 +650,8 @@ class BasicTrainer(nn.Module):
         return state_dict
 
     def load_state_dict(self, state_dict: dict, load_only_model: bool =True, strict: bool = True):
+        # print(f"Loading state dict from {state_dict}")
+        
         step = state_dict.pop("step")
         self.step = step
         logger.info(f"Loading checkpoint at step {step}")
@@ -673,6 +675,7 @@ class BasicTrainer(nn.Module):
         # load model
         model_state_dict = state_dict.pop("models")
         for class_name in self.models.keys():
+            print(f"Loading {class_name} from checkpoint")
             model = self.models[class_name]
             model.step = step
             if class_name not in model_state_dict:
@@ -694,6 +697,7 @@ class BasicTrainer(nn.Module):
         Load model from checkpoint.
         """
         logger.info(f"Loading checkpoint from {ckpt_path}")
+        print(f"Loading checkpoint from {ckpt_path}")
         state_dict = torch.load(ckpt_path)
         self.load_state_dict(state_dict, load_only_model=load_only_model, strict=True)
         

@@ -16,11 +16,12 @@ class RigidNodes(VanillaGaussians):
         self,
         **kwargs
     ):
-        # print all the parameters
-        print("RigidNodes parameters:")
-        for k, v in kwargs.items():
-            print(f"{k}: {v}")
         super().__init__(**kwargs)
+        print(f"Initializing RigidNodes with {kwargs}")
+        self.dataset_id_to_model_id_map: Dict[int, int] = {}
+        self.model_id_to_dataset_id_map: Dict[int, int] = {}
+        self.track_token_to_model_id_map: Dict[str, int] = {}
+        self.model_id_to_track_token_map: Dict[int, str] = {}
         
     @property
     def num_instances(self):
@@ -43,7 +44,7 @@ class RigidNodes(VanillaGaussians):
     def create_from_pcd(self, instance_pts_dict: Dict[str, torch.Tensor]) -> None:
         """
         instance_pts_dict: {
-            id in dataset: {
+            id in dataset: { # Note: This key is usually a string from json, but represents an int
                 "class_name": str,
                 "pts": torch.Tensor, (N, 3)
                 "colors": torch.Tensor, (N, 3)
@@ -51,9 +52,12 @@ class RigidNodes(VanillaGaussians):
                 "size": torch.Tensor, (3, )
                 "frame_info": torch.Tensor, (num_frame)
                 "num_pts": int,
+                "track_token": str or None,
             },
         }
         """
+        
+        print(f"Creating RigidNodes from pcd with {len(instance_pts_dict)} instances")
         # collect all instances
         init_means = []
         init_colors = []
@@ -61,13 +65,53 @@ class RigidNodes(VanillaGaussians):
         instances_size = []
         instances_fv = []
         point_ids = []
-        for id_in_model, (id_in_dataset, v) in enumerate(instance_pts_dict.items()):
+        
+        current_model_id = 0
+        temp_dataset_id_to_model_id_map = {}
+        temp_model_id_to_dataset_id_map = {}
+        temp_track_token_to_model_id_map = {}
+        temp_model_id_to_track_token_map = {}
+
+        for id_in_dataset_str, v in instance_pts_dict.items():
+            # Get the actual track token from the data
+            track_token = v.get("track_token", None)
+            
+            try:
+                # Ensure id_in_dataset is an integer, as it comes from JSON string keys
+                id_in_dataset = int(id_in_dataset_str)
+            except ValueError:
+                print(f"Could not convert dataset ID '{id_in_dataset_str}' to int. Skipping this instance.")
+                continue
+
             init_means.append(v["pts"])
             init_colors.append(v["colors"])
             instances_pose.append(v["poses"].unsqueeze(1))
             instances_size.append(v["size"])
             instances_fv.append(v["frame_info"].unsqueeze(1))
-            point_ids.append(torch.full((v["num_pts"], 1), id_in_model, dtype=torch.long))
+            point_ids.append(torch.full((v["num_pts"], 1), current_model_id, dtype=torch.long))
+            
+            temp_dataset_id_to_model_id_map[id_in_dataset] = current_model_id
+            temp_model_id_to_dataset_id_map[current_model_id] = id_in_dataset
+            
+            # Add the track token mapping only if track_token is not None
+            if track_token is not None:
+                temp_track_token_to_model_id_map[track_token] = current_model_id
+                temp_model_id_to_track_token_map[current_model_id] = track_token
+                
+            current_model_id += 1
+            
+        self.dataset_id_to_model_id_map = temp_dataset_id_to_model_id_map
+        self.model_id_to_dataset_id_map = temp_model_id_to_dataset_id_map
+        self.track_token_to_model_id_map = temp_track_token_to_model_id_map
+        self.model_id_to_track_token_map = temp_model_id_to_track_token_map
+
+        # Debug: Print the mapping information
+        logger.info(f"RigidNodes initialized with {len(self.track_token_to_model_id_map)} track tokens:")
+        for track_token, model_id in list(self.track_token_to_model_id_map.items())[:5]:  # Show first 5
+            print(f"  Track token {track_token} -> Model ID {model_id}")
+        if len(self.track_token_to_model_id_map) > 5:
+            print(f"  ... and {len(self.track_token_to_model_id_map) - 5} more")
+
         init_means = torch.cat(init_means, dim=0).to(self.device) # (N, 3)
         init_colors = torch.cat(init_colors, dim=0).to(self.device) # (N, 3)
         instances_pose = torch.cat(instances_pose, dim=1).to(self.device) # (num_frame, num_instances, 4, 4)
@@ -488,6 +532,11 @@ class RigidNodes(VanillaGaussians):
             "points_ids": self.point_ids,
             "instances_size": self.instances_size,
             "instances_fv": self.instances_fv,
+            # Add the mapping dictionaries
+            "dataset_id_to_model_id_map": self.dataset_id_to_model_id_map,
+            "model_id_to_dataset_id_map": self.model_id_to_dataset_id_map,
+            "track_token_to_model_id_map": self.track_token_to_model_id_map,
+            "model_id_to_track_token_map": self.model_id_to_track_token_map,
         })
         return state_dict
     
@@ -495,6 +544,13 @@ class RigidNodes(VanillaGaussians):
         self.point_ids = state_dict.pop("points_ids")
         self.instances_size = state_dict.pop("instances_size")
         self.instances_fv = state_dict.pop("instances_fv")
+        
+        # Restore the mapping dictionaries, providing default empty dicts for backward compatibility
+        self.dataset_id_to_model_id_map = state_dict.pop("dataset_id_to_model_id_map", {})
+        self.model_id_to_dataset_id_map = state_dict.pop("model_id_to_dataset_id_map", {})
+        self.track_token_to_model_id_map = state_dict.pop("track_token_to_model_id_map", {})
+        self.model_id_to_track_token_map = state_dict.pop("model_id_to_track_token_map", {})
+        
         self.instances_trans = Parameter(
             torch.zeros(self.num_frames, self.num_instances, 3, device=self.device)
         )
@@ -569,7 +625,10 @@ class RigidNodes(VanillaGaussians):
             ins_id: instance id
             delta_xyz: translation vector
         """
+        # Find points belonging to this instance
         pts_mask = self.point_ids[..., 0] == ins_id
+        
+        # Apply translation directly to the means
         self._means[pts_mask] = self._means[pts_mask] + delta_xyz
     
     def rotate_instance(self, ins_id: int, delta_quat: torch.Tensor) -> None:
@@ -581,7 +640,23 @@ class RigidNodes(VanillaGaussians):
             delta_quat: rotation quaternion
         """
         pts_mask = self.point_ids[..., 0] == ins_id
-        self._quats[pts_mask] = quat_mult(self._quats[pts_mask], delta_quat)
+        # rotate the points
+        means = self._means[pts_mask]
+        delta_quat = self.quat_act(delta_quat)  # normalize quaternion
+        delta_rot = quat_to_rotmat(delta_quat)  # convert to rotation matrix
+        
+        # Apply rotation around the instance center
+        center = means.mean(dim=0, keepdim=True)
+        centered_points = means - center
+        rotated_points = torch.bmm(delta_rot.unsqueeze(0).expand(centered_points.shape[0], -1, -1), 
+                                   centered_points.unsqueeze(-1)).squeeze(-1)
+        self._means[pts_mask] = rotated_points + center
+        
+        # Also update the quaternions of the gaussians
+        quats = self._quats[pts_mask]
+        normalized_quats = self.quat_act(quats)
+        # Multiply quaternions: new_q = delta_q * old_q
+        self._quats[pts_mask] = self.quat_act(quat_mult(delta_quat.unsqueeze(0).expand_as(normalized_quats), normalized_quats))
     
     def scale_instance(self, ins_id: int, delta_scale: torch.Tensor) -> None:
         """
@@ -589,11 +664,26 @@ class RigidNodes(VanillaGaussians):
         
         Args:
             ins_id: instance id
-            delta_scale: scaling vector
+            delta_scale: scaling vector (log scale)
         """
         pts_mask = self.point_ids[..., 0] == ins_id
+        
+        # Get current means and center point
+        means = self._means[pts_mask]
+        center = means.mean(dim=0, keepdim=True)
+        
+        # Apply scaling from the center point
+        centered_points = means - center
+        
+        # Apply delta_scale to the log scale values
         self._scales[pts_mask] = self._scales[pts_mask] + delta_scale
-    
+        
+        # Also scale the points' positions from center
+        # Convert delta_scale from log space to linear space
+        linear_scale = torch.exp(delta_scale)
+        scaled_points = centered_points * linear_scale
+        self._means[pts_mask] = scaled_points + center
+
     def export_gaussians_to_ply(self, alpha_thresh: float, instance_id: List[int] = None) -> Dict[str, torch.Tensor]:
         pts_mask = self.point_ids[..., 0] == instance_id
         

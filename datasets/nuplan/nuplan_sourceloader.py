@@ -260,6 +260,16 @@ class NuPlanPixelSource(ScenePixelSource):
         instances_model_types = instances_model_types[ins_frame_cnt > 0]
         per_frame_instance_mask = per_frame_instance_mask[:, ins_frame_cnt > 0]
         
+        instances_track_tokens = []
+        for i in range(num_instances):
+            if str(i) in instances_info:
+                track_token = instances_info[str(i)]["id"]
+                instances_track_tokens.append(track_token)
+            else:
+                instances_track_tokens.append(None)
+        
+        self.instances_track_tokens = [instances_track_tokens[i] for i in range(len(instances_track_tokens)) if ins_frame_cnt[i] > 0]
+                
         # assign to the class
         # (num_frames, num_instances, 4, 4)
         self.instances_pose = instances_pose
@@ -298,7 +308,7 @@ class NuPlanPixelSource(ScenePixelSource):
                             "frame_valid": torch.zeros((frame_num), dtype=torch.bool)
                         }
                         smpl_human_all[instance_id]["smpl_quats"][:, :, 0] = 1.0
-                    if ins_smpl["valid_mask"][fi]:
+                    if fi < len(ins_smpl["valid_mask"]) and ins_smpl["valid_mask"][fi]:
                         betas = ins_smpl["smpl"]["betas"][fi]
                         smpl_human_all[instance_id]["smpl_betas"][fi - self.start_timestep] = betas
                         

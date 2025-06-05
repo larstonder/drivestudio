@@ -32,6 +32,8 @@ class MultiTrainer(BasicTrainer):
             self.gaussian_classes["SMPLNodes"] = GSModelType.SMPLNodes
         if "DeformableNodes" in self.model_config:
             self.gaussian_classes["DeformableNodes"] = GSModelType.DeformableNodes
+        
+        print("Initing models")
            
         for class_name, model_cfg in self.model_config.items():
             # update model config for gaussian classes
@@ -94,6 +96,7 @@ class MultiTrainer(BasicTrainer):
                 cur_node_type='RigidNodes',
                 **self.model_config["RigidNodes"]["init"]
             )
+            print(f"MultiTrainer: rigidnode_pts_dict has {len(rigidnode_pts_dict)} items for RigidNodes.") 
 
         if "DeformableNodes" in self.model_config:
             deformnode_pts_dict = dataset.get_init_objects(
@@ -208,6 +211,10 @@ class MultiTrainer(BasicTrainer):
         Returns:
             Dict[str, torch.Tensor]: output of the model
         """
+        
+        # print image and camera info
+        # print(f"image_infos: {image_infos}")
+        # print(f"camera_infos: {camera_infos}")
 
         # set current time or use temporal smoothing
         normed_time = image_infos["normed_time"].flatten()[0]
@@ -232,18 +239,6 @@ class MultiTrainer(BasicTrainer):
             image_ids=image_infos["img_idx"].flatten()[0],
             novel_view=novel_view
         )
-
-        # edit every second rigid node with node.translate_instances
-        # for class_name in self.gaussian_classes.keys():
-        #     model = self.models[class_name]
-        #     if hasattr(model, 'translate_instances'):
-        #         instances_size = model.instances_size # (num_instances, 3)
-        #         for i in range(0, instances_size.shape[0], 2):
-        #             model.translate_instances(
-        #                 ins_id=i,
-        #                 delta_xyz=0.1 * torch.randn(3).to(self.device)
-        #             )
-
         gs = self.collect_gaussians(
             cam=processed_cam,
             image_ids=image_infos["img_idx"].flatten()[0]
@@ -307,26 +302,75 @@ class MultiTrainer(BasicTrainer):
         
         return metric_dict
     
-    def edit_nodes(self):
-        print("Editing nodes")
-        for class_name in self.gaussian_classes.keys():
-            print(f"\nEditing {class_name}")
-            model = self.models[class_name]
-            # print all attributes
-
-            for key in model.__dict__.keys():
-                print(f"{key}: {model.__dict__[key]}")
-
-            if hasattr(model, 'translate_instance'):
-                instances_size = model.instances_size # (num_instances, 3)
-                for i in range(0, instances_size.shape[0], 2):
-
-                    if hasattr(model, 'point_ids'):
-                        print(f"Point ids: {model.point_ids[i].item()}")
+    # def edit_nodes(self):
+    #     """Edit the nodes in the scene graph.
+    #     This method is used to modify the positions of objects in the scene.
+    #     """
+    #     try:
+    #         print("=== Starting node editing debug ===")
+    #         for class_name in self.gaussian_classes.keys():
+    #             print(f"\n=== Examining {class_name} ===")
+    #             model = self.models[class_name]
+                
+    #             # Print available attributes and methods
+    #             print(f"Available attributes: {[attr for attr in dir(model) if not attr.startswith('_')]}")
+                
+    #             # Check for instance-related attributes
+    #             if hasattr(model, 'instances_size'):
+    #                 print(f"Instances size: {model.instances_size.shape}, {model.instances_size}")
+                
+    #             if hasattr(model, 'instances_pose'):
+    #                 print(f"Instances pose: {model.instances_pose.shape}, {model.instances_pose[:2]}")
                     
-                    forward_tensor = torch.tensor([5, 0.0, 0.0]).to(self.device)
-                    model.translate_instance(
-                        ins_id=i,
-                        delta_xyz=forward_tensor
-                    )
-        print("Editing nodes done")
+    #             if hasattr(model, 'num_instances'):
+    #                 print(f"Number of instances: {model.num_instances}")
+                    
+    #             if hasattr(model, 'instances_xyz'):
+    #                 print(f"Instances xyz: {model.instances_xyz.shape}, {model.instances_xyz[:2]}")
+                    
+    #             if hasattr(model, 'point_ids'):
+    #                 print(f"Point IDs: {model.point_ids.shape}, Sample: {model.point_ids[:5]}")
+                    
+    #             # Check for translation/rotation methods
+    #             has_translate = hasattr(model, 'translate_instance')
+    #             has_rotate = hasattr(model, 'rotate_instance')
+    #             has_scale = hasattr(model, 'scale_instance')
+    #             print(f"Has translation method: {has_translate}")
+    #             print(f"Has rotation method: {has_rotate}")
+    #             print(f"Has scaling method: {has_scale}")
+                
+    #             # Debug instance manipulation for the first few instances
+    #             if hasattr(model, 'instances_size'):
+    #                 for i in range(min(3, model.instances_size.shape[0])):
+    #                     print(f"\nInstance {i} details:")
+                        
+    #                     # Get individual instance data
+    #                     if hasattr(model, 'point_ids'):
+    #                         point_mask = model.point_ids == i
+    #                         num_points = point_mask.sum().item()
+    #                         print(f"  - Contains {num_points} points")
+                        
+    #                     if hasattr(model, 'instances_xyz'):
+    #                         print(f"  - Position: {model.instances_xyz[i]}")
+                        
+    #                     if hasattr(model, 'instances_pose'):
+    #                         print(f"  - Pose: {model.instances_pose[i]}")
+                        
+    #                     if hasattr(model, 'instances_size'):
+    #                         print(f"  - Size: {model.instances_size[i]}")
+                        
+    #                     # Check available transformation methods
+    #                     print("  - Available transformations:")
+    #                     print(f"    * translate_instance: {has_translate}")
+    #                     print(f"    * rotate_instance: {has_rotate}")
+    #                     print(f"    * scale_instance: {has_scale}")
+                        
+    #                     # Example of how you would translate (commented out)
+    #                     # if has_translate:
+    #                     #     print("    * Example translation code:")
+    #                     #     print("    * forward_tensor = torch.tensor([1.0, 0.0, 0.0]).to(self.device)")
+    #                     #     print(f"    * model.translate_instance(ins_id={i}, delta_xyz=forward_tensor)")
+            
+    #         print("\n=== Node editing debug complete ===")
+    #     except Exception as e:
+    #         print(f"Error in edit_nodes: {str(e)}")

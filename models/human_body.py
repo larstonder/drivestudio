@@ -15,10 +15,13 @@ from pytorch3d.transforms import (
     axis_angle_to_matrix
 )
 
+assert os.path.exists("third_party/smplx/smplx/utils.py"), "Please run `git submodule update --init --recursive` to download the SMPLX model files."
+print("SMPLX model files found. Proceeding with the import.")
+
 from models.modules import VoxelDeformer
-from third_party.smplx.smplx import SMPLLayer
 from third_party.smplx.smplx.utils import SMPLOutput
 from third_party.smplx.smplx.lbs import vertices2joints, batch_rigid_transform
+from third_party.smplx.smplx import SMPLLayer
 
 def blockPrinting(func):
     def func_wrapper(*args, **kwargs):
@@ -79,7 +82,7 @@ def get_predefined_human_rest_pose(pose_type):
     else:
         raise ValueError("Unknown cano_pose: {}".format(pose_type))
     return body_pose_t.reshape(23, 3)
-    
+
 class SMPLTemplate(nn.Module):
     def __init__(self, smpl_model_path, num_human, init_beta, cano_pose_type, voxel_deformer_res=64, use_voxel_deformer=False, is_resume=False):
         super().__init__()
@@ -293,7 +296,7 @@ def get_on_mesh_init_geo_values(
     s_all = torch.cat(s_all, dim=0)
     o_all = torch.cat(o_all, dim=0)
     return x_all, q_all, s_all, o_all
-    
+
 phalp_colors =[
     [213.0,255.0,0.0,],
     [255.0,0.0,86.0,],

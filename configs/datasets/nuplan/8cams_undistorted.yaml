@@ -15,7 +15,8 @@ data:
   dataset: nuplan # dataset type
   scene_idx: 2021.05.12.22.00.38_veh-35_01008_01518 # which scene to use, specific to NuPlan's naming convention
   start_timestep: 0 # which timestep to start from
-  end_timestep: -1 # which timestep to end at, -1 means the last timestep
+  # end_timestep: -1 # which timestep to end at, -1 means the last timestep
+  end_timestep: 299 # which timestep to end at, -1 means the last timestep
   preload_device: cpu # choose from ["cpu", "cuda"], cache the data on this device
   pixel_source: # image source and object annotations
     type: datasets.nuplan.nuplan_sourceloader.NuPlanPixelSource
